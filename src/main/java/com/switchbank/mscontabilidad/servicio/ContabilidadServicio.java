@@ -5,6 +5,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.switchbank.mscontabilidad.dto.CrearCuentaRequest;
 import com.switchbank.mscontabilidad.dto.CuentaDTO;
+import com.switchbank.mscontabilidad.dto.MovimientoDTO;
 import com.switchbank.mscontabilidad.dto.RegistroMovimientoRequest;
 import com.switchbank.mscontabilidad.dto.ReturnRequestDTO;
 import com.switchbank.mscontabilidad.modelo.CuentaTecnica;
@@ -12,24 +13,24 @@ import com.switchbank.mscontabilidad.modelo.Movimiento;
 import com.switchbank.mscontabilidad.modelo.TipoMovimiento;
 import com.switchbank.mscontabilidad.repositorio.CuentaTecnicaRepository;
 import com.switchbank.mscontabilidad.repositorio.MovimientoRepository;
+import com.switchbank.mscontabilidad.mapper.ContabilidadMapper;
 
+import lombok.RequiredArgsConstructor;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.UUID;
+import java.util.List;
 
 @Service
-public class LedgerService {
+@RequiredArgsConstructor
+public class ContabilidadServicio {
 
     private final CuentaTecnicaRepository cuentaRepo;
     private final MovimientoRepository movimientoRepo;
-
-    public LedgerService(CuentaTecnicaRepository cuentaRepo, MovimientoRepository movimientoRepo) {
-        this.cuentaRepo = cuentaRepo;
-        this.movimientoRepo = movimientoRepo;
-    }
+    private final ContabilidadMapper mapper;
 
     @Transactional
     public CuentaDTO crearCuenta(CrearCuentaRequest req) {
@@ -41,7 +42,7 @@ public class LedgerService {
         cuenta.setFirmaIntegridad(calcularHash(cuenta));
 
         CuentaTecnica saved = cuentaRepo.save(cuenta);
-        return mapToDTO(saved);
+        return mapper.toDTO(saved);
     }
 
     @Transactional
@@ -78,13 +79,13 @@ public class LedgerService {
         cuenta.setFirmaIntegridad(calcularHash(cuenta));
         CuentaTecnica saved = cuentaRepo.save(cuenta);
 
-        return mapToDTO(saved);
+        return mapper.toDTO(saved);
     }
 
     public CuentaDTO obtenerCuenta(String bic) {
         CuentaTecnica cuenta = cuentaRepo.findByCodigoBic(bic)
                 .orElseThrow(() -> new RuntimeException("Cuenta no encontrada"));
-        return mapToDTO(cuenta);
+        return mapper.toDTO(cuenta);
     }
 
     @Transactional(readOnly = true)
@@ -101,7 +102,7 @@ public class LedgerService {
 
             CuentaTecnica cuenta = cuentaRepo.findByCodigoBic(bic)
                     .orElseThrow(() -> new RuntimeException("Cuenta no encontrada"));
-            return mapToDTO(cuenta);
+            return mapper.toDTO(cuenta);
         }
 
         CuentaTecnica cuenta = cuentaRepo.findByCodigoBic(bic)
@@ -124,7 +125,7 @@ public class LedgerService {
         movimientoRepo.save(mov);
 
         cuenta.setFirmaIntegridad(calcularHash(cuenta));
-        return mapToDTO(cuentaRepo.save(cuenta));
+        return mapper.toDTO(cuentaRepo.save(cuenta));
     }
 
     @Transactional
@@ -189,12 +190,13 @@ public class LedgerService {
         movimientoRepo.save(reverso);
 
         cuenta.setFirmaIntegridad(calcularHash(cuenta));
-        return mapToDTO(cuentaRepo.save(cuenta));
+        return mapper.toDTO(cuentaRepo.save(cuenta));
     }
 
     @Transactional(readOnly = true)
-    public java.util.List<Movimiento> obtenerMovimientosPorRango(LocalDateTime start, LocalDateTime end) {
-        return movimientoRepo.findByFechaRegistroBetween(start, end);
+    public List<MovimientoDTO> obtenerMovimientosPorRango(LocalDateTime start, LocalDateTime end) {
+        List<Movimiento> movimientos = movimientoRepo.findByFechaRegistroBetween(start, end);
+        return mapper.toDTOList(movimientos);
     }
 
     private String calcularHash(CuentaTecnica c) {
@@ -215,12 +217,4 @@ public class LedgerService {
         }
     }
 
-    private CuentaDTO mapToDTO(CuentaTecnica c) {
-        return CuentaDTO.builder()
-                .id(c.getId())
-                .codigoBic(c.getCodigoBic())
-                .saldoDisponible(c.getSaldoDisponible())
-                .firmaIntegridad(c.getFirmaIntegridad())
-                .build();
-    }
 }
